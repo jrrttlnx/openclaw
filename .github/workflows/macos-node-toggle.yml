@@ -29,7 +29,7 @@ env:
 
 jobs:
   native:
-    runs-on: macos-latest
+    runs-on: macos-15
     timeout-minutes: 45
     steps:
       - name: Check out the exact commit
