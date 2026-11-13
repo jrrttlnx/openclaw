@@ -18,14 +18,19 @@ const repoRoot = path.resolve(import.meta.dirname, "../..");
 const node = process.versions.bun ? "node" : process.execPath;
 const childEnv = { PATH: process.env.PATH, HOME: process.env.HOME };
 
-/** A slot whose entry prints its name, then exits with the given code. */
+/** A slot whose entry prints its name, then exits with the given code; Doctor runs are counted. */
 function writeSlot(root: string, name: string, exitCode: number) {
   fs.mkdirSync(root, { recursive: true });
   fs.writeFileSync(
     path.join(root, "openclaw.mjs"),
-    `console.log(JSON.stringify({ slot: ${JSON.stringify(name)}, args: process.argv.slice(2), entry: process.argv[1] }));\nprocess.exitCode = ${exitCode};\n`,
+    `import fs from "node:fs";\nif (process.argv[2] === "doctor") {\n  fs.appendFileSync(${JSON.stringify(path.join(root, "doctor.log"))}, process.env.OPENCLAW_UPDATE_IN_PROGRESS + "\\n");\n  process.exit(0);\n}\nconsole.log(JSON.stringify({ slot: ${JSON.stringify(name)}, args: process.argv.slice(2), entry: process.argv[1] }));\nprocess.exitCode = ${exitCode};\n`,
   );
 }
+
+const doctorRuns = (root: string) =>
+  fs.existsSync(path.join(root, "doctor.log"))
+    ? fs.readFileSync(path.join(root, "doctor.log"), "utf8").split("\n").filter(Boolean)
+    : [];
 
 async function createLayout() {
   const state = temporary.make("openclaw-runtime-slots-");
@@ -71,7 +76,10 @@ it("spends two trial starts on a failing slot, then returns to the previous slot
 
   expect(start(dir)).toMatchObject({ slot: "a", status: 1 });
   expect(readRuntimePointer(dir)?.trial).toBe(1);
+  // Only the first start of the new slot runs its Doctor, before its Gateway opens state.
+  expect(doctorRuns(slot)).toEqual(["1"]);
   expect(start(dir)).toMatchObject({ slot: "a", status: 1 });
+  expect(doctorRuns(slot)).toEqual(["1"]);
   const third = start(dir);
   expect(third).toMatchObject({ slot: "origin", status: 0 });
   expect(third.stderr).toContain("did not start");

@@ -8,6 +8,7 @@ import os from "node:os";
 import path from "node:path";
 import {
   readRuntimePointer,
+  RUNTIME_SLOT_TRIAL_STARTS,
   runtimeEntry,
   writeRuntimePointer,
   type RuntimePointer,
@@ -16,10 +17,8 @@ import { resolveStateDir } from "../config/state-dir.js";
 import { hasNodeErrorCode, isPathInside } from "./path-guards.js";
 import { applyPathPrepend } from "./path-prepend.js";
 
-export { readRuntimePointer, type RuntimePointer };
+export { readRuntimePointer, RUNTIME_SLOT_TRIAL_STARTS, type RuntimePointer };
 
-/** Gateway starts a new slot gets before the launcher returns to the previous one. */
-export const RUNTIME_SLOT_TRIAL_STARTS = 2;
 const SLOT_NAMES = ["a", "b"] as const;
 const RUNTIME_LAUNCHER_FILE = "launcher.mjs";
 const LOCK_STALE_MS = 60_000;

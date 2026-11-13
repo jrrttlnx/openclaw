@@ -13,4 +13,8 @@ export const RUNTIME_POINTER_FILE: "slots.json";
 export function readRuntimePointer(dir: string): RuntimePointer | null;
 export function writeRuntimePointer(dir: string, pointer: RuntimePointer): void;
 export function runtimeEntry(root: string): string;
-export function selectRuntimeRoot(dir: string, options: { start: boolean }): string;
+export const RUNTIME_SLOT_TRIAL_STARTS: number;
+export function selectRuntimeRoot(
+  dir: string,
+  options: { start: boolean },
+): { root: string; first: boolean };

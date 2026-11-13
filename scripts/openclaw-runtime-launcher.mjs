@@ -4,7 +4,7 @@
 // It starts the runtime slot that slots.json selects. While a new slot is on
 // trial, each Gateway start spends one attempt. When none are left, it returns
 // to the previous slot. Keep it dependency-free: it must outlive every slot.
-import { spawn } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -45,10 +45,15 @@ export function writeRuntimePointer(dir, pointer) {
   fs.renameSync(temporary, file);
 }
 
+/** Gateway starts a new slot gets before the launcher returns to the previous one. */
+export const RUNTIME_SLOT_TRIAL_STARTS = 2;
 export const runtimeEntry = (root) => path.join(root, "openclaw.mjs");
 const usable = (root) => typeof root === "string" && fs.existsSync(runtimeEntry(root));
 
-/** A Gateway start spends one trial attempt; a CLI call only reads the pointer. */
+/**
+ * A Gateway start spends one trial attempt; a CLI call only reads the pointer.
+ * `first` marks the first start of a newly selected slot.
+ */
 export function selectRuntimeRoot(dir, { start }) {
   const pointer = readRuntimePointer(dir);
   if (!pointer) {
@@ -66,16 +71,32 @@ export function selectRuntimeRoot(dir, { start }) {
       // The Gateway that starts on the fallback reports the update run as rolled back.
       ...(pointer.run ? { run: pointer.run } : {}),
     });
-    return fallback;
+    return { root: fallback, first: false };
   }
   if (start && onTrial) {
     writeRuntimePointer(dir, { ...pointer, trial: pointer.trial - 1 });
   }
-  return pointer.current;
+  return { root: pointer.current, first: start && pointer.trial === RUNTIME_SLOT_TRIAL_STARTS };
 }
 
 export function launchRuntime(dir, argv, { start }) {
-  const root = selectRuntimeRoot(dir, { start });
+  const { root, first } = selectRuntimeRoot(dir, { start });
+  if (first) {
+    // The old Gateway has stopped and the new one has not opened state yet: the new
+    // slot's own Doctor migrates state and plugins, as the in-place updater did here.
+    spawnSync(
+      process.execPath,
+      [
+        runtimeEntry(root),
+        "doctor",
+        "--repair",
+        "--non-interactive",
+        "--no-workspace-suggestions",
+        "--yes",
+      ],
+      { stdio: "inherit", env: { ...process.env, OPENCLAW_UPDATE_IN_PROGRESS: "1" } },
+    );
+  }
   const args = [...process.execArgv, runtimeEntry(root), ...argv];
   if (process.platform !== "win32" && typeof process.execve === "function") {
     // Keep the supervisor's PID: the slot replaces this process.
