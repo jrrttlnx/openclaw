@@ -1,0 +1,67 @@
+name: macOS node mode toggle
+
+on:
+  push:
+    branches:
+      - taj/macos-node-mode-toggle
+    paths:
+      - ".github/workflows/macos-node-toggle.yml"
+      - "apps/macos/**"
+      - "scripts/test-macos-native.mts"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/macos-node-toggle.yml"
+      - "apps/macos/**"
+      - "scripts/test-macos-native.mts"
+  workflow_dispatch:
+
+concurrency:
+  group: macos-node-mode-toggle-${{ github.event_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+jobs:
+  native:
+    runs-on: macos-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out the exact commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          fetch-tags: false
+          persist-credentials: false
+          submodules: false
+
+      - name: Set up Node for the native test runner
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "26.12.1"
+          cache: false
+
+      - name: Record the tested revision and toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+          node --version
+          git rev-parse HEAD
+
+      - name: Build OpenClaw
+        run: swift build --package-path apps/macos --build-system native --product OpenClaw
+
+      - name: Build native tests
+        run: swift build --package-path apps/macos --build-system native --build-tests
+
+      - name: Run isolated native settings tests
+        run: |
+          node scripts/test-macos-native.mts default \
+            --package-path apps/macos --build-system native --skip-build \
+            --filter 'NodeModeSettingsTests|ComputerControlSettingsTests'
