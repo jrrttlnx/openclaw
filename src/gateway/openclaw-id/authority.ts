@@ -56,7 +56,7 @@ import {
   type OpenClawIdMemberProfiles,
 } from "./member-profiles.js";
 import {
-  assertMemberRoleDefined,
+  prepareMemberRoleChangeAssertion,
   roleChangeDisconnects,
   refuseUndefinedMemberRole,
 } from "./member-role-change.js";
@@ -432,11 +432,7 @@ export function createOpenClawIdAuthority(
           }
           return { ok: false, code: result.code, detail: result.detail };
         }
-        const change = parseStatement(input, "MembershipChange");
-        const role =
-          change.ok && change.statement.body.target.op === "set_role"
-            ? change.statement.body.target.role
-            : undefined;
+        const assertRoleCurrent = prepareMemberRoleChangeAssertion(input);
         const resolved = resolvedInvite(input);
         await commit(
           {
@@ -453,7 +449,7 @@ export function createOpenClawIdAuthority(
                 }
               : {}),
           },
-          () => assertMemberRoleDefined(role),
+          assertRoleCurrent,
         );
         const reconnect = roleChangeDisconnects(current.authority, result.state);
         return {
