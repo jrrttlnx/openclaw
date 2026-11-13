@@ -40,10 +40,18 @@ jobs:
           persist-credentials: false
           submodules: false
 
-      - name: Set up Node for the native test runner
-        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: Set up Node for Swift build inputs
+        uses: ./.github/actions/setup-node-env
         with:
           node-version: "26.12.1"
+          install-bun: "false"
+          install-deps: "false"
+          cache-mode: "off"
+
+      - name: Prepare Swift build inputs
+        run: |
+          pnpm install --frozen-lockfile --filter '@openclaw/mermaid-renderer...' --filter '@openclaw/gateway-protocol...'
+          node scripts/prepare-apple-mermaid.mjs
 
       - name: Record the tested revision and toolchain
         run: |
